@@ -1,0 +1,22 @@
+[
+  { "id": "g01", "question": "What happened with the Claude certification I was studying for?", "expectedDocumentId": "post-2026-07-09" },
+  { "id": "g02", "question": "Why does learning get harder as AI gets better?", "expectedDocumentId": "letter-01" },
+  { "id": "g03", "question": "What is the audit problem with AI-generated work?", "expectedDocumentId": "letter-02" },
+  { "id": "g04", "question": "What connects my first factory sensor program to the systems I build now?", "expectedDocumentId": "post-2026-06-04" },
+  { "id": "g05", "question": "What kept me awake for three nights?", "expectedDocumentId": "post-2026-05-06" },
+  { "id": "g06", "question": "What did I submit to the Microsoft agents hackathon?", "expectedDocumentId": "post-2026-06-18" },
+  { "id": "g07", "question": "Who independently built the same knowledge-wiki pattern I use?", "expectedDocumentId": "post-2026-06-25" },
+  { "id": "g08", "question": "How is my AI assistant's memory system layered?", "expectedDocumentId": "post-2026-06-30" },
+  { "id": "g09", "question": "What does Hyrum's Law say about system behavior?", "expectedDocumentId": "post-2026-06-23" },
+  { "id": "g10", "question": "What is the difference between the centaur and cyborg ways of working with AI?", "expectedDocumentId": "post-2026-06-09" },
+  { "id": "g11", "question": "What is the story behind the dropdown?", "expectedDocumentId": "letter-06" },
+  { "id": "g12", "question": "What project did I build without realizing I was building it?", "expectedDocumentId": "letter-04" },
+  { "id": "g13", "question": "What is a eucatastrophe?", "expectedDocumentId": "post-2026-05-19" },
+  { "id": "g14", "question": "How do Poe, Shannon and Turing connect in the history of AI?", "expectedDocumentId": "post-2026-05-26" },
+  { "id": "g15", "question": "What is the bags of water and well-organized sand idea about?", "expectedDocumentId": "post-2026-05-12" },
+  { "id": "g16", "question": "Besides the knowledge base itself, what else did building Noesis give me?", "expectedDocumentId": "letter-03" },
+  { "id": "g17", "question": "What is Aletheia and what does it do?", "expectedDocumentId": "post-2026-07-06" },
+  { "id": "g18", "question": "How do I classify validation issues by severity?", "expectedDocumentId": "post-2026-07-07" },
+  { "id": "g19", "question": "What response came too late, and from whom?", "expectedDocumentId": "letter-05" },
+  { "id": "g20", "question": "What is the Noesis Letters newsletter about?", "expectedDocumentId": "post-2026-05-21" }
+]

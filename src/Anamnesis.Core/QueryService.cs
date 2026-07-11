@@ -4,7 +4,7 @@ namespace Anamnesis.Core;
 
 public sealed class QueryService(RetrievalService retrieval, IAnswerClient answerClient)
 {
-    private const string SystemPrompt =
+    internal const string GroundingSystemPrompt =
         """
         You answer questions about the author's published writing (LinkedIn posts and Substack letters).
         Use ONLY the numbered source excerpts provided in the user message.
@@ -20,7 +20,7 @@ public sealed class QueryService(RetrievalService retrieval, IAnswerClient answe
             return new QueryResult(question, "The corpus is empty — run ingestion first.", [], null, null);
 
         var reply = await answerClient
-            .CompleteAsync(SystemPrompt, BuildUserPrompt(question, hits), cancellationToken)
+            .CompleteAsync(GroundingSystemPrompt, BuildUserPrompt(question, hits), cancellationToken)
             .ConfigureAwait(false);
 
         var citations = hits

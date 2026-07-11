@@ -18,8 +18,23 @@ builder.Services.AddHttpClient<IEmbeddingClient, OpenAiEmbeddingClient>(client =
 });
 builder.Services.AddSingleton<IngestService>();
 builder.Services.AddSingleton<RetrievalService>();
-builder.Services.AddSingleton<IAnswerClient>(_ => new AnthropicAnswerClient(new AnthropicClient(), chatModel));
+builder.Services.AddHttpClient("openai-chat", client =>
+{
+    var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+        ?? throw new InvalidOperationException("OPENAI_API_KEY is not set.");
+    client.BaseAddress = new Uri("https://api.openai.com/");
+    client.DefaultRequestHeaders.Authorization = new("Bearer", apiKey);
+});
+builder.Services.AddSingleton<IAnswerClient>(sp =>
+{
+    var fallbackModel = builder.Configuration["Anamnesis:FallbackChatModel"] ?? "gpt-4o-mini";
+    var primary = new AnthropicAnswerClient(new AnthropicClient(), chatModel);
+    var fallback = new OpenAiAnswerClient(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("openai-chat"), fallbackModel);
+    return new FailoverAnswerClient(primary, fallback);
+});
 builder.Services.AddSingleton<QueryService>();
+builder.Services.AddSingleton<EvalService>();
 
 var app = builder.Build();
 
@@ -29,7 +44,7 @@ app.MapGet("/", () => Results.Ok(new
 {
     name = "Anamnesis",
     description = "RAG over my published writing — grounded, cited, measured.",
-    endpoints = new[] { "POST /ingest", "GET /stats", "POST /query" }
+    endpoints = new[] { "POST /ingest", "GET /stats", "POST /query", "POST /evals/run" }
 }));
 
 app.MapPost("/ingest", async (IngestService ingest, CancellationToken cancellationToken) =>
@@ -45,6 +60,14 @@ app.MapPost("/query", async (QueryRequest request, QueryService query, Cancellat
 
     var result = await query.AskAsync(request.Question, request.TopK ?? 5, cancellationToken);
     return Results.Ok(result);
+});
+
+app.MapPost("/evals/run", async (EvalService evals, int? k, bool? answers, CancellationToken cancellationToken) =>
+{
+    var goldenPath = app.Configuration["Anamnesis:GoldenPath"] ?? "evals/golden.json";
+    var resultsPath = app.Configuration["Anamnesis:ResultsPath"] ?? "evals/results.jsonl";
+    var summary = await evals.RunAsync(goldenPath, resultsPath, k ?? 5, answers ?? false, cancellationToken);
+    return Results.Ok(summary);
 });
 
 app.MapGet("/stats", (ChunkStore store) =>
