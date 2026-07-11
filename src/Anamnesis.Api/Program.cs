@@ -3,8 +3,13 @@ using Anthropic;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var dbPath = builder.Configuration["Anamnesis:DbPath"] ?? "data/anamnesis.db";
-var corpusRoot = builder.Configuration["Anamnesis:CorpusRoot"] ?? "corpus";
+// `dotnet run` sets the working directory to the project folder — anchor
+// relative paths at the repo root (first ancestor containing corpus/ or .git).
+var repoRoot = FindRepoRoot();
+string Resolve(string path) => Path.IsPathRooted(path) ? path : Path.Combine(repoRoot, path);
+
+var dbPath = Resolve(builder.Configuration["Anamnesis:DbPath"] ?? "data/anamnesis.db");
+var corpusRoot = Resolve(builder.Configuration["Anamnesis:CorpusRoot"] ?? "corpus");
 var chatModel = builder.Configuration["Anamnesis:ChatModel"] ?? "claude-haiku-4-5";
 
 builder.Services.AddSingleton(new ChunkStore(dbPath));
@@ -64,8 +69,8 @@ app.MapPost("/query", async (QueryRequest request, QueryService query, Cancellat
 
 app.MapPost("/evals/run", async (EvalService evals, int? k, bool? answers, CancellationToken cancellationToken) =>
 {
-    var goldenPath = app.Configuration["Anamnesis:GoldenPath"] ?? "evals/golden.json";
-    var resultsPath = app.Configuration["Anamnesis:ResultsPath"] ?? "evals/results.jsonl";
+    var goldenPath = Resolve(app.Configuration["Anamnesis:GoldenPath"] ?? "evals/golden.json");
+    var resultsPath = Resolve(app.Configuration["Anamnesis:ResultsPath"] ?? "evals/results.jsonl");
     var summary = await evals.RunAsync(goldenPath, resultsPath, k ?? 5, answers ?? false, cancellationToken);
     return Results.Ok(summary);
 });
@@ -78,5 +83,18 @@ app.MapGet("/stats", (ChunkStore store) =>
 });
 
 app.Run();
+
+static string FindRepoRoot()
+{
+    var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+    while (dir is not null)
+    {
+        if (Directory.Exists(Path.Combine(dir.FullName, "corpus")) ||
+            Directory.Exists(Path.Combine(dir.FullName, ".git")))
+            return dir.FullName;
+        dir = dir.Parent;
+    }
+    return Directory.GetCurrentDirectory();
+}
 
 internal sealed record QueryRequest(string Question, int? TopK);
