@@ -82,7 +82,7 @@ Results append to `evals/results.jsonl`, so tuning changes (chunk size, k, promp
 
 | Run | k | Hit-rate@k | MRR | Faithful | Notes |
 |---|---|---|---|---|---|
-| _pending first live run_ | | | | | baseline |
+| 2026-07-11 | 5 | **0.95** | **0.90** | **1.00** | Baseline — 21 docs / 29 chunks. One retrieval miss (abstractly-phrased question vs. metaphor-heavy letter); the answer for it correctly declined rather than inventing, so faithfulness held at 100%. Answers served by `claude-haiku-4-5` (primary path); retrieval ~550ms, answers ~3.5s avg. |
 
 ## Honest scale notes
 
