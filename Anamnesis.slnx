@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Anamnesis.Api/Anamnesis.Api.csproj" />
+    <Project Path="src/Anamnesis.Core/Anamnesis.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Anamnesis.Tests/Anamnesis.Tests.csproj" />
+  </Folder>
+</Solution>
