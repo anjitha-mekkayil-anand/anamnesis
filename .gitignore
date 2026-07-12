@@ -484,3 +484,9 @@ $RECYCLE.BIN/
 # Anamnesis local artifacts
 data/
 *.pid
+
+# demo video artifacts (sources are committed; outputs are not)
+docs/video/node_modules/
+docs/video/clips/
+docs/video/tts/
+docs/video/*.mp4

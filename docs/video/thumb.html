@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>thumb</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: #1b1f24;
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #fafaf7;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .wrap { text-align: center; }
+  .kicker {
+    font-family: 'Segoe UI', Arial, sans-serif; font-size: 26px; letter-spacing: 6px;
+    color: #8ab4f8; text-transform: uppercase; margin-bottom: 18px;
+  }
+  h1 { font-size: 118px; letter-spacing: 2px; margin-bottom: 14px; }
+  .tag { font-size: 34px; color: #c9d1d9; font-style: italic; margin-bottom: 46px; }
+  .metrics { display: flex; gap: 26px; justify-content: center; }
+  .m {
+    background: #fafaf7; color: #1b1f24; border-radius: 14px;
+    padding: 18px 34px; min-width: 250px;
+  }
+  .m .num { font-size: 64px; font-weight: 700; color: #0757ba; }
+  .m .lbl { font-family: 'Segoe UI', Arial, sans-serif; font-size: 19px; color: #444; margin-top: 2px; }
+  .corner {
+    position: fixed; top: 28px; right: 34px;
+    font-family: 'Segoe UI', Arial, sans-serif; font-size: 24px; font-weight: 700;
+    color: #1b1f24; background: #8ab4f8; border-radius: 8px; padding: 8px 18px;
+  }
+</style>
+</head>
+<body>
+  <div class="corner">.NET · RAG</div>
+  <div class="wrap">
+    <div class="kicker">Ask my writing</div>
+    <h1>Anamnesis</h1>
+    <div class="tag">Grounded. Cited. Measured.</div>
+    <div class="metrics">
+      <div class="m"><div class="num">0.95</div><div class="lbl">hit-rate@5</div></div>
+      <div class="m"><div class="num">0.90</div><div class="lbl">MRR</div></div>
+      <div class="m"><div class="num">1.00</div><div class="lbl">faithfulness</div></div>
+    </div>
+  </div>
+</body>
+</html>

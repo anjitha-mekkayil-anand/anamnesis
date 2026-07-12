@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Anamnesis — outro</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    font-family: Georgia, 'Times New Roman', serif;
+    background: #fafaf7; color: #1f2328;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card { text-align: center; max-width: 900px; }
+  h1 { font-size: 64px; letter-spacing: 1px; margin-bottom: 10px; }
+  .tag { font-size: 24px; color: #57606a; margin-bottom: 42px; }
+  .metrics { display: flex; gap: 28px; justify-content: center; margin-bottom: 42px; }
+  .metric {
+    background: #fff; border: 1.5px solid #e4e8ec; border-radius: 12px;
+    padding: 22px 30px; min-width: 200px;
+  }
+  .metric .num { font-size: 44px; font-weight: 700; color: #0757ba; }
+  .metric .lbl { font-family: 'Segoe UI', Arial, sans-serif; font-size: 15px; color: #57606a; margin-top: 6px; }
+  .stack { font-family: 'Segoe UI', Arial, sans-serif; font-size: 18px; color: #57606a; margin-bottom: 30px; }
+  .repo { font-family: 'Segoe UI', Arial, sans-serif; font-size: 24px; color: #0757ba; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Anamnesis</h1>
+    <div class="tag">Grounded. Cited. Measured.</div>
+    <div class="metrics">
+      <div class="metric"><div class="num">0.95</div><div class="lbl">retrieval hit-rate@5</div></div>
+      <div class="metric"><div class="num">0.90</div><div class="lbl">mean reciprocal rank</div></div>
+      <div class="metric"><div class="num">1.00</div><div class="lbl">answer faithfulness</div></div>
+    </div>
+    <div class="stack">.NET 10 · SQLite embeddings · exact cosine retrieval · Claude → OpenAI failover (Polly) · LLM-as-judge evals · xUnit</div>
+    <div class="repo">github.com/anjitha-mekkayil-anand/anamnesis</div>
+  </div>
+</body>
+</html>

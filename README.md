@@ -4,6 +4,8 @@
 
 Anamnesis is a .NET-native RAG (retrieval-augmented generation) service that answers questions over my own published writing — grounded, cited, measured. It demonstrates production-shaped RAG engineering end to end: ingestion, retrieval, multi-provider LLM routing with fallback, and an evaluation harness with real quality metrics.
 
+**▶ [60-second demo](https://youtu.be/ZRlSzQ6BE30)** — cited answers live, including the moment it declines a question the sources don't cover.
+
 ## What it does
 
 | Stage | How |
