@@ -23,17 +23,17 @@ public sealed class QueryService(RetrievalService retrieval, IAnswerClient answe
             .CompleteAsync(GroundingSystemPrompt, BuildUserPrompt(question, hits), cancellationToken)
             .ConfigureAwait(false);
 
-        var citations = hits
-            .Select((hit, i) => new Citation(
-                Number: i + 1,
-                DocumentId: hit.Chunk.DocumentId,
-                Title: hit.Chunk.DocumentTitle,
-                Ordinal: hit.Chunk.Ordinal,
-                Score: Math.Round(hit.Score, 4)))
-            .ToList();
-
-        return new QueryResult(question, reply.Text, citations, reply.Model, reply.Provider);
+        return new QueryResult(question, reply.Text, BuildCitations(hits), reply.Model, reply.Provider);
     }
+
+    internal static IReadOnlyList<Citation> BuildCitations(IReadOnlyList<ScoredChunk> hits) => hits
+        .Select((hit, i) => new Citation(
+            Number: i + 1,
+            DocumentId: hit.Chunk.DocumentId,
+            Title: hit.Chunk.DocumentTitle,
+            Ordinal: hit.Chunk.Ordinal,
+            Score: Math.Round(hit.Score, 4)))
+        .ToList();
 
     internal static string BuildUserPrompt(string question, IReadOnlyList<ScoredChunk> hits)
     {

@@ -37,6 +37,11 @@
   .examples a:hover { text-decoration: underline; }
   #status { font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.85rem; color: #57606a; min-height: 1.4em; margin-bottom: 14px; }
   #answer { white-space: pre-wrap; font-size: 1.02rem; }
+  #answer.streaming::after {
+    content: "▍"; color: #0757ba;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
   #answer:not(:empty) {
     background: #fff; border: 1.5px solid #e4e8ec; border-radius: 10px; padding: 20px 22px;
   }
@@ -95,39 +100,110 @@
 
     btn.disabled = true;
     answer.textContent = "";
+    answer.classList.remove("streaming");
     citations.innerHTML = "";
-    status.textContent = "Retrieving and answering…";
     const started = performance.now();
 
     try {
-      const response = await fetch("/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, topK: 5 }),
-      });
-
-      if (response.status === 429) {
-        status.textContent = "Rate limit reached — give it a minute and try again.";
-        return;
-      }
-      if (!response.ok) {
-        status.textContent = "Something went wrong (" + response.status + "). Try again shortly.";
-        return;
-      }
-
-      const result = await response.json();
-      const seconds = ((performance.now() - started) / 1000).toFixed(1);
-      answer.textContent = result.answer;
-      citations.innerHTML = result.citations
-        .map(c => `<div><span class="cite-n">[${c.number}]</span> ${escapeHtml(c.title)} <span style="color:#8c959f">· similarity ${c.score}</span></div>`)
-        .join("");
-      status.textContent = `Answered in ${seconds}s · ${result.provider} (${result.model})`;
+      // Streaming first; the plain /query path is the fallback below.
+      await askStreaming(question, started);
     } catch {
-      status.textContent = "Network error — try again.";
+      try {
+        await askPlain(question, started);
+      } catch {
+        status.textContent = "Network error — try again.";
+      }
     } finally {
+      answer.classList.remove("streaming");
       btn.disabled = false;
     }
   });
+
+  // Streaming path: citations render the moment retrieval finishes, then the
+  // answer types itself token by token. Throws to trigger the plain fallback.
+  async function askStreaming(question, started) {
+    status.textContent = "Retrieving…";
+    const response = await fetch("/query/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, topK: 5 }),
+    });
+
+    if (response.status === 429) {
+      status.textContent = "Rate limit reached — give it a minute and try again.";
+      return;
+    }
+    if (!response.ok || !response.body) throw new Error("stream unavailable");
+
+    answer.classList.add("streaming");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundary;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const raw = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+
+        let eventName = "message", data = "";
+        for (const line of raw.split("\n")) {
+          if (line.startsWith("event: ")) eventName = line.slice(7);
+          else if (line.startsWith("data: ")) data = line.slice(6);
+        }
+        if (!data) continue;
+        const payload = JSON.parse(data);
+
+        if (eventName === "citations") {
+          renderCitations(payload);
+          status.textContent = "Sources found — answering…";
+        } else if (eventName === "delta") {
+          answer.textContent += payload.text;
+        } else if (eventName === "error") {
+          status.textContent = payload.message;
+        } else if (eventName === "done") {
+          const seconds = ((performance.now() - started) / 1000).toFixed(1);
+          status.textContent = `Answered in ${seconds}s · ${payload.provider} (${payload.model})` +
+            (payload.streamed ? "" : " · single response");
+        }
+      }
+    }
+  }
+
+  // Plain path — the original non-streaming call, kept as graceful degradation.
+  async function askPlain(question, started) {
+    status.textContent = "Retrieving and answering…";
+    const response = await fetch("/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, topK: 5 }),
+    });
+
+    if (response.status === 429) {
+      status.textContent = "Rate limit reached — give it a minute and try again.";
+      return;
+    }
+    if (!response.ok) {
+      status.textContent = "Something went wrong (" + response.status + "). Try again shortly.";
+      return;
+    }
+
+    const result = await response.json();
+    const seconds = ((performance.now() - started) / 1000).toFixed(1);
+    answer.textContent = result.answer;
+    renderCitations(result.citations);
+    status.textContent = `Answered in ${seconds}s · ${result.provider} (${result.model})`;
+  }
+
+  function renderCitations(list) {
+    citations.innerHTML = list
+      .map(c => `<div><span class="cite-n">[${c.number}]</span> ${escapeHtml(c.title)} <span style="color:#8c959f">· similarity ${c.score}</span></div>`)
+      .join("");
+  }
 
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));

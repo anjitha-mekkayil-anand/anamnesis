@@ -12,7 +12,8 @@ Anamnesis is a .NET-native RAG (retrieval-augmented generation) service that ans
 |---|---|
 | **Ingest** | Paragraph-aware chunking with overlap → OpenAI `text-embedding-3-small` (batched) → SQLite (embeddings as float32 BLOBs) |
 | **Query** | Embed the question → exact cosine top-k → numbered-excerpt prompt → grounded LLM answer with inline `[n]` citations |
-| **Route** | Claude primary (official Anthropic SDK) → retry with exponential backoff + per-attempt timeout (Polly) → automatic failover to OpenAI. Caller cancellation is never swallowed. |
+| **Stream** | `/query/stream` (SSE): citations arrive the moment retrieval finishes, then the answer streams token by token. A failure before the first token silently degrades to the non-streaming failover chain; a failure after tokens is surfaced honestly — a partial answer is never passed off as complete. The bundled UI uses this path with the plain `/query` as fallback. |
+| **Route** | Claude primary (official Anthropic SDK) → retry with exponential backoff + per-attempt timeout (Polly) → automatic failover to OpenAI. Caller cancellation is never swallowed. Optional local mode routes answers to an OpenAI-compatible local server first (see below). |
 | **Measure** | Golden question set → retrieval hit-rate@k + MRR, LLM-judged answer faithfulness, latency per stage — every run appends a dated row to `evals/results.jsonl` |
 
 ## Corpus
@@ -70,7 +71,18 @@ curl -X POST "http://localhost:5000/evals/run?k=5&answers=true"
 curl http://localhost:5000/stats
 ```
 
-Configuration (`appsettings.json` or environment): `Anamnesis:DbPath`, `Anamnesis:CorpusRoot`, `Anamnesis:ChatModel` (default `claude-haiku-4-5`), `Anamnesis:FallbackChatModel` (default `gpt-4o-mini`).
+Configuration (`appsettings.json` or environment): `Anamnesis:DbPath`, `Anamnesis:CorpusRoot`, `Anamnesis:ChatModel` (default `claude-haiku-4-5`), `Anamnesis:FallbackChatModel` (default `gpt-4o-mini`), `Anamnesis:ChatMode` (`cloud` default | `local`), `Anamnesis:LocalChatBaseUrl` (default `http://localhost:11434/`), `Anamnesis:LocalChatModel` (default `llama3.2`).
+
+## Local inference mode
+
+Set `Anamnesis:ChatMode=local` and answers route to any OpenAI-compatible local server first — [Ollama](https://ollama.com) is the zero-config option:
+
+```bash
+ollama pull llama3.2          # once
+dotnet run --project src/Anamnesis.Api   # with Anamnesis:ChatMode=local
+```
+
+The local server becomes the primary answer provider (`provider: "local"` in responses), with the cloud chain (Claude → OpenAI) as automatic fallback — same failover machinery, one more tier. Honest scope note: **embeddings still use OpenAI** (`text-embedding-3-small`), so an API key is still required for ingestion and query embedding; pointing embeddings at a local model is the documented next step, not silently claimed. Streaming currently rides the Anthropic SDK, so in local mode the UI receives the answer as a single response via the same graceful-degradation path.
 
 ## Evaluation
 
@@ -94,4 +106,4 @@ Other deliberate choices: embeddings come from OpenAI because Anthropic doesn't 
 
 ## Tests
 
-Unit tests cover the chunker (boundaries, overlap, ordinals), vector math (edge cases incl. zero vectors), frontmatter parsing, SQLite round-trip and re-ingest idempotency, retrieval ranking, prompt assembly, router failover behavior (healthy / retry-then-failover / both-fail / cancellation), and eval metrics (rank, MRR, judge-verdict parsing). All run without API keys.
+Unit tests cover the chunker (boundaries, overlap, ordinals), vector math (edge cases incl. zero vectors), frontmatter parsing, SQLite round-trip and re-ingest idempotency, retrieval ranking, prompt assembly, router failover behavior (healthy / retry-then-failover / both-fail / cancellation), streaming behavior (citations-first ordering, pre-token failure degrading to fallback, post-token failure surfaced rather than silently replaced, cancellation), and eval metrics (rank, MRR, judge-verdict parsing). All run without API keys.

@@ -3,10 +3,12 @@ using System.Text.Json.Serialization;
 
 namespace Anamnesis.Core;
 
-public sealed class OpenAiAnswerClient(HttpClient httpClient, string model = "gpt-4o-mini")
+public sealed class OpenAiAnswerClient(HttpClient httpClient, string model = "gpt-4o-mini", string providerName = "openai")
     : IAnswerClient
 {
-    public string ProviderName => "openai";
+    // providerName distinguishes OpenAI itself from any OpenAI-compatible
+    // endpoint (e.g. a local Ollama server) reusing this same wire format.
+    public string ProviderName => providerName;
 
     public async Task<AnswerReply> CompleteAsync(string systemPrompt, string userPrompt, CancellationToken cancellationToken = default)
     {

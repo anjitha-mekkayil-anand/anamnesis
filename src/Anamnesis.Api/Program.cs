@@ -14,6 +14,12 @@ var corpusRoot = Resolve(builder.Configuration["Anamnesis:CorpusRoot"] ?? "corpu
 var chatModel = builder.Configuration["Anamnesis:ChatModel"] ?? "claude-haiku-4-5";
 // Public-demo hardening: read-only mode exposes only the UI, /query and /stats.
 var readOnlyMode = builder.Configuration.GetValue("Anamnesis:ReadOnlyMode", false);
+// ChatMode "local" routes answers to an OpenAI-compatible local server (e.g.
+// Ollama) as primary, with the cloud chain as fallback. Embeddings stay on
+// OpenAI either way — local embeddings are the documented next step.
+var chatMode = builder.Configuration["Anamnesis:ChatMode"] ?? "cloud";
+var localChatBaseUrl = builder.Configuration["Anamnesis:LocalChatBaseUrl"] ?? "http://localhost:11434/";
+var localChatModel = builder.Configuration["Anamnesis:LocalChatModel"] ?? "llama3.2";
 
 builder.Services.AddSingleton(new ChunkStore(dbPath));
 builder.Services.AddSingleton(new Chunker());
@@ -33,15 +39,34 @@ builder.Services.AddHttpClient("openai-chat", client =>
     client.BaseAddress = new Uri("https://api.openai.com/");
     client.DefaultRequestHeaders.Authorization = new("Bearer", apiKey);
 });
+if (chatMode == "local")
+{
+    builder.Services.AddHttpClient("local-chat", client =>
+    {
+        client.BaseAddress = new Uri(localChatBaseUrl);  // no auth — local server
+    });
+}
+builder.Services.AddSingleton(new AnthropicAnswerClient(new AnthropicClient(), chatModel));
 builder.Services.AddSingleton<IAnswerClient>(sp =>
 {
     var fallbackModel = builder.Configuration["Anamnesis:FallbackChatModel"] ?? "gpt-4o-mini";
-    var primary = new AnthropicAnswerClient(new AnthropicClient(), chatModel);
-    var fallback = new OpenAiAnswerClient(
-        sp.GetRequiredService<IHttpClientFactory>().CreateClient("openai-chat"), fallbackModel);
-    return new FailoverAnswerClient(primary, fallback);
+    var cloudChain = new FailoverAnswerClient(
+        sp.GetRequiredService<AnthropicAnswerClient>(),
+        new OpenAiAnswerClient(
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("openai-chat"), fallbackModel));
+    if (chatMode != "local")
+        return cloudChain;
+    var local = new OpenAiAnswerClient(
+        sp.GetRequiredService<IHttpClientFactory>().CreateClient("local-chat"), localChatModel, providerName: "local");
+    return new FailoverAnswerClient(local, cloudChain);
 });
 builder.Services.AddSingleton<QueryService>();
+builder.Services.AddSingleton(sp => new StreamingQueryService(
+    sp.GetRequiredService<RetrievalService>(),
+    // Streaming rides the Anthropic SDK; in local mode answers should stay
+    // local, so the stream endpoint degrades to the (local-first) full path.
+    chatMode == "local" ? null : sp.GetRequiredService<AnthropicAnswerClient>(),
+    sp.GetRequiredService<IAnswerClient>()));
 builder.Services.AddSingleton<EvalService>();
 
 // Every LLM call spends real money — throttle per client IP and cap the whole
@@ -84,8 +109,8 @@ app.MapGet("/about", () => Results.Ok(new
     description = "RAG over my published writing — grounded, cited, measured.",
     readOnly = readOnlyMode,
     endpoints = readOnlyMode
-        ? new[] { "GET /", "POST /query", "GET /stats" }
-        : new[] { "GET /", "POST /ingest", "GET /stats", "POST /query", "POST /evals/run" }
+        ? new[] { "GET /", "POST /query", "POST /query/stream", "GET /stats" }
+        : new[] { "GET /", "POST /ingest", "GET /stats", "POST /query", "POST /query/stream", "POST /evals/run" }
 }));
 
 app.MapPost("/query", async (QueryRequest request, QueryService query, CancellationToken cancellationToken) =>
@@ -98,6 +123,53 @@ app.MapPost("/query", async (QueryRequest request, QueryService query, Cancellat
     var topK = Math.Clamp(request.TopK ?? 5, 1, 8);
     var result = await query.AskAsync(request.Question, topK, cancellationToken);
     return Results.Ok(result);
+});
+
+// Server-Sent Events: citations arrive first (retrieval is done before the
+// answer starts), then token deltas, then a terminal `done`. If streaming
+// fails before the first token, the same request silently degrades to the
+// non-streaming failover chain and the answer arrives as one delta.
+app.MapPost("/query/stream", async (HttpContext context, QueryRequest request, StreamingQueryService streamingQuery, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question))
+        return Results.BadRequest(new { error = "Question is required." });
+    if (request.Question.Length > 300)
+        return Results.BadRequest(new { error = "Question is limited to 300 characters." });
+
+    var topK = Math.Clamp(request.TopK ?? 5, 1, 8);
+
+    context.Response.Headers.ContentType = "text/event-stream";
+    context.Response.Headers.CacheControl = "no-cache";
+
+    var json = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+    async Task WriteEventAsync(string eventName, object payload)
+    {
+        await context.Response.WriteAsync(
+            $"event: {eventName}\ndata: {System.Text.Json.JsonSerializer.Serialize(payload, json)}\n\n",
+            cancellationToken);
+        await context.Response.Body.FlushAsync(cancellationToken);
+    }
+
+    await foreach (var streamEvent in streamingQuery.AskStreamingAsync(request.Question, topK, cancellationToken))
+    {
+        switch (streamEvent)
+        {
+            case CitationsStreamEvent citations:
+                await WriteEventAsync("citations", citations.Citations);
+                break;
+            case DeltaStreamEvent delta:
+                await WriteEventAsync("delta", new { text = delta.Text });
+                break;
+            case ErrorStreamEvent error:
+                await WriteEventAsync("error", new { message = error.Message });
+                break;
+            case DoneStreamEvent done:
+                await WriteEventAsync("done", new { model = done.Model, provider = done.Provider, streamed = done.Streamed });
+                break;
+        }
+    }
+
+    return Results.Empty;
 });
 
 app.MapGet("/stats", (ChunkStore store) =>
