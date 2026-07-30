@@ -18,8 +18,12 @@
   }
   h1 { font-size: 1.9rem; letter-spacing: 0.3px; }
   .sub { color: #57606a; margin: 6px 0 4px; font-size: 1.02rem; }
-  .meta { font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.8rem; color: #6e7781; margin-bottom: 28px; }
-  .meta a { color: #0757ba; text-decoration: none; }
+  /* Muted text stays #57606a or darker: at these sizes on #fafaf7, #6e7781 and
+     #8c959f fail WCAG AA contrast (caught by the axe gate, tools/a11y). */
+  .meta { font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.8rem; color: #57606a; margin-bottom: 28px; }
+  /* Underlined because these links sit inside a text block — colour alone is not
+     a sufficient distinction (WCAG 1.4.1). */
+  .meta a { color: #0757ba; text-decoration: underline; }
   form { display: flex; gap: 8px; margin-bottom: 10px; }
   input[type="text"] {
     flex: 1; font: inherit; font-size: 1rem;
@@ -48,7 +52,7 @@
   .citations { margin-top: 18px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.83rem; color: #57606a; }
   .citations div { margin-bottom: 3px; }
   .cite-n { color: #0757ba; font-weight: 600; }
-  footer { margin-top: 44px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.78rem; color: #8c959f; }
+  footer { margin-top: 44px; font-family: 'Segoe UI', Arial, sans-serif; font-size: 0.78rem; color: #57606a; }
 </style>
 </head>
 <body>
