@@ -1,0 +1,96 @@
+name: ci
+
+# Constraint gates. Deterministic checks the model can't argue with:
+# correctness (build + tests), security (vulnerable deps + secrets), accessibility (axe on the UI).
+# Every job must pass before a change is considered shippable.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  correctness:
+    name: correctness (build + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore Anamnesis.slnx
+      - run: dotnet build Anamnesis.slnx --configuration Release --no-restore
+      - name: Tests
+        # The suite is designed to run without API keys; if that ever stops being
+        # true, fix the test, not this workflow.
+        run: dotnet test Anamnesis.slnx --configuration Release --no-build --verbosity normal
+
+  security:
+    name: security (vulnerable deps + secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore Anamnesis.slnx
+
+      - name: Vulnerable NuGet packages (direct + transitive)
+        # `dotnet list --vulnerable` exits 0 even when it finds advisories, so the
+        # gate parses its JSON instead of trusting the exit code or matching prose.
+        run: python3 tools/deps_scan.py
+
+      - name: Secrets scan (tracked files)
+        run: python3 tools/secrets_scan.py
+
+  accessibility:
+    name: accessibility (axe on the bundled UI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install axe + Playwright
+        working-directory: tools/a11y
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Start the API
+        # A dummy key is enough: the HttpClient configuration is lazy and loading
+        # the page makes no upstream calls. Nothing is embedded or answered here.
+        env:
+          OPENAI_API_KEY: dummy-key-for-a11y-only
+        run: |
+          dotnet run --project src/Anamnesis.Api --configuration Release \
+            --urls http://127.0.0.1:5099 > api.a11y.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:5099/about > /dev/null; then
+              echo "API up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API did not become ready in 60s"; cat api.a11y.log; exit 1
+
+      - name: axe scan
+        working-directory: tools/a11y
+        env:
+          A11Y_URL: http://127.0.0.1:5099/
+        run: node check.mjs
+
+      - name: API log on failure
+        if: failure()
+        run: cat api.a11y.log || true

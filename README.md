@@ -107,3 +107,32 @@ Other deliberate choices: embeddings come from OpenAI because Anthropic doesn't 
 ## Tests
 
 Unit tests cover the chunker (boundaries, overlap, ordinals), vector math (edge cases incl. zero vectors), frontmatter parsing, SQLite round-trip and re-ingest idempotency, retrieval ranking, prompt assembly, router failover behavior (healthy / retry-then-failover / both-fail / cancellation), streaming behavior (citations-first ordering, pre-token failure degrading to fallback, post-token failure surfaced rather than silently replaced, cancellation), and eval metrics (rank, MRR, judge-verdict parsing). All run without API keys.
+
+## Constraint gates
+
+CI (`.github/workflows/ci.yml`) runs three gates on every push and pull request. Each one
+is a deterministic check with a pass/fail exit code — not a report somebody has to read:
+
+| Gate | What it enforces | Run it locally |
+|---|---|---|
+| **Correctness** | build + the full test suite | `dotnet test Anamnesis.slnx` |
+| **Security — dependencies** | no NuGet advisory on any package, direct *or* transitive | `python tools/deps_scan.py` |
+| **Security — secrets** | no key-shaped string in any tracked file | `python tools/secrets_scan.py` |
+| **Accessibility** | axe-core over the bundled UI, WCAG 2.1 A/AA, fails at impact ≥ serious | `cd tools/a11y && npm install && A11Y_URL=http://127.0.0.1:5099/ node check.mjs` |
+
+Two notes on why these are scripts rather than one-liners in the workflow:
+
+- `dotnet list package --vulnerable` **exits 0 even when it finds advisories**, so it cannot
+  gate anything on its own. `deps_scan.py` parses its JSON, and treats "the check could not
+  run" as a failure too — an unrunnable gate must never look like a pass.
+- `secrets_scan.py` keeps its patterns deliberately narrow, and placeholders go in an explicit
+  allow-list with a reason. A gate that cries wolf gets muted, and a muted gate is worse than
+  no gate.
+
+The a11y gate found two real WCAG failures in the UI the first time it ran (muted-text
+contrast, and links distinguished by colour alone); both are fixed, and the CSS carries a
+comment saying why the colours can't drift back.
+
+Not gated, and named rather than implied: **mutation testing** (coverage stops being evidence
+once tests are generated rather than written) and a **performance budget**. The scale reasoning
+for the latter is in the honest-scale notes above; nothing enforces it yet.

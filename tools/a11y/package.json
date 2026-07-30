@@ -1,0 +1,14 @@
+{
+  "name": "anamnesis-a11y",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Accessibility gate for the Anamnesis UI (axe-core via Playwright). Dev-only; the app itself has no Node dependencies.",
+  "type": "module",
+  "scripts": {
+    "check": "node check.mjs"
+  },
+  "dependencies": {
+    "@axe-core/playwright": "^4.10.1",
+    "playwright": "^1.49.1"
+  }
+}

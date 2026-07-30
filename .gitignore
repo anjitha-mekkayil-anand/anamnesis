@@ -485,6 +485,11 @@ $RECYCLE.BIN/
 data/
 *.pid
 
+# a11y gate: dev-only tooling install (check.mjs + package.json are committed)
+tools/a11y/node_modules/
+tools/a11y/package-lock.json
+tools/a11y/test-results/
+
 # demo video artifacts (sources are committed; outputs are not)
 docs/video/node_modules/
 docs/video/clips/
