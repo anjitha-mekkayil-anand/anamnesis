@@ -43,6 +43,7 @@ public sealed class EvalService(RetrievalService retrieval, IAnswerClient answer
         var summary = new EvalRunSummary(
             RunAtUtc: DateTime.UtcNow,
             K: k,
+            RetrievalMode: retrieval.Mode.ToString(),
             Items: results.Count,
             HitRate: Math.Round(results.Average(r => r.Hit ? 1.0 : 0.0), 4),
             Mrr: Math.Round(results.Average(r => r.ReciprocalRank), 4),
@@ -148,9 +149,15 @@ public sealed record EvalItemResult(
     bool? Faithful,
     string? JudgeReason);
 
+/// <summary>
+/// <paramref name="RetrievalMode"/> is written on every row so that appended runs
+/// stay comparable — a hit-rate delta means nothing if the retrieval mode behind
+/// each row can't be read back off the line.
+/// </summary>
 public sealed record EvalRunSummary(
     DateTime RunAtUtc,
     int K,
+    string RetrievalMode,
     int Items,
     double HitRate,
     double Mrr,

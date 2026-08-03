@@ -20,6 +20,10 @@ var readOnlyMode = builder.Configuration.GetValue("Anamnesis:ReadOnlyMode", fals
 var chatMode = builder.Configuration["Anamnesis:ChatMode"] ?? "cloud";
 var localChatBaseUrl = builder.Configuration["Anamnesis:LocalChatBaseUrl"] ?? "http://localhost:11434/";
 var localChatModel = builder.Configuration["Anamnesis:LocalChatModel"] ?? "llama3.2";
+// Hybrid (cosine fused with BM25) is the default; "VectorOnly" restores the
+// pre-hybrid behaviour so the two can be measured against each other on the
+// same golden set. Every eval row records which mode produced it.
+var retrievalMode = builder.Configuration.GetValue("Anamnesis:RetrievalMode", RetrievalMode.Hybrid);
 
 builder.Services.AddSingleton(new ChunkStore(dbPath));
 builder.Services.AddSingleton(new Chunker());
@@ -31,7 +35,10 @@ builder.Services.AddHttpClient<IEmbeddingClient, OpenAiEmbeddingClient>(client =
     client.DefaultRequestHeaders.Authorization = new("Bearer", apiKey);
 });
 builder.Services.AddSingleton<IngestService>();
-builder.Services.AddSingleton<RetrievalService>();
+builder.Services.AddSingleton(sp => new RetrievalService(
+    sp.GetRequiredService<ChunkStore>(),
+    sp.GetRequiredService<IEmbeddingClient>(),
+    retrievalMode));
 builder.Services.AddHttpClient("openai-chat", client =>
 {
     var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY")

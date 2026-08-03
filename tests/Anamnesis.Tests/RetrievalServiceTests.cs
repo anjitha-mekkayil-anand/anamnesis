@@ -48,6 +48,62 @@ public class RetrievalServiceTests : IDisposable
         Assert.Equal(3, hits.Count);
     }
 
+    [Fact]
+    public async Task Search_Hybrid_SurfacesAnExactIdentifierTheEmbeddingMisses()
+    {
+        // The reason hybrid search exists: the embedding points away from the chunk
+        // that literally contains the identifier the reader typed.
+        var store = new ChunkStore(_dbPath);
+        store.EnsureCreated();
+        store.ReplaceDocument(
+            new CorpusDocument("doc-1", "Doc One", "post", "2026-08-03", "a.md", "x"),
+            [
+                new Chunk("doc-1", 0, "a general discussion of memory management and drivers"),
+                new Chunk("doc-1", 1, "bugcheck 0x10E is VIDEO_MEMORY_MANAGEMENT_INTERNAL"),
+            ],
+            [[1f, 0f], [0f, 1f]]);
+
+        var embedding = new FakeEmbeddingClient(_ => [1f, 0f]);
+
+        var vectorOnly = await new RetrievalService(store, embedding, RetrievalMode.VectorOnly)
+            .SearchAsync("bugcheck 0x10E", topK: 1);
+        var hybrid = await new RetrievalService(store, embedding, RetrievalMode.Hybrid)
+            .SearchAsync("bugcheck 0x10E", topK: 1);
+
+        Assert.Equal(0, vectorOnly[0].Chunk.Ordinal);
+        Assert.Equal(1, hybrid[0].Chunk.Ordinal);
+    }
+
+    [Fact]
+    public async Task Search_Hybrid_KeepsScoreAsCosineForCitations()
+    {
+        var store = new ChunkStore(_dbPath);
+        store.EnsureCreated();
+        store.ReplaceDocument(
+            new CorpusDocument("doc-1", "Doc One", "post", "2026-08-03", "a.md", "x"),
+            [new Chunk("doc-1", 0, "about dogs")],
+            [[1f, 0f]]);
+
+        var hits = await new RetrievalService(store, new FakeEmbeddingClient(_ => [1f, 0f]))
+            .SearchAsync("dogs", topK: 1);
+
+        Assert.Equal(1.0, hits[0].Score, 6);          // cosine, unchanged meaning
+        Assert.True(hits[0].LexicalScore > 0);        // matched lexically too
+        Assert.True(hits[0].FusedScore is > 0 and < 1);
+    }
+
+    [Fact]
+    public async Task Search_ReturnsEmptyForEmptyCorpus()
+    {
+        var store = new ChunkStore(_dbPath);
+        store.EnsureCreated();
+
+        var hits = await new RetrievalService(store, new FakeEmbeddingClient(_ => [1f, 0f]))
+            .SearchAsync("anything", topK: 5);
+
+        Assert.Empty(hits);
+    }
+
     public void Dispose()
     {
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();

@@ -21,4 +21,25 @@ public sealed record EmbeddedChunk(
     string Text,
     float[] Embedding);
 
-public sealed record ScoredChunk(EmbeddedChunk Chunk, double Score);
+/// <summary>
+/// <paramref name="Score"/> stays the cosine similarity, which is what citations
+/// surface to callers. Hybrid retrieval orders by <see cref="FusedScore"/> instead,
+/// so a chunk found only by the lexical index still reports a meaningful vector score.
+/// </summary>
+public sealed record ScoredChunk(EmbeddedChunk Chunk, double Score)
+{
+    /// <summary>BM25 score; zero when the chunk shares no term with the query.</summary>
+    public double LexicalScore { get; init; }
+
+    /// <summary>Reciprocal-rank-fusion score across the vector and lexical rankings.</summary>
+    public double FusedScore { get; init; }
+}
+
+public enum RetrievalMode
+{
+    /// <summary>Cosine similarity only — the behaviour before hybrid search landed.</summary>
+    VectorOnly,
+
+    /// <summary>Cosine similarity fused with BM25 by reciprocal rank fusion.</summary>
+    Hybrid,
+}
